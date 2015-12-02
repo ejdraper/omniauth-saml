@@ -16,7 +16,11 @@ module OmniAuth
       ]
       option :attribute_service_name, 'Required attributes'
 
+      option :log_event, Proc.new { |event_type, message, data| }
+
       def request_phase
+        options[:log_event].call(:request, "request_phase", {:params => request.params})
+
         options[:assertion_consumer_service_url] ||= callback_url
         runtime_request_parameters = options.delete(:idp_sso_target_url_runtime_params)
 
@@ -32,6 +36,8 @@ module OmniAuth
       end
 
       def callback_phase
+        options[:log_event].call(:callback, "callback_phase", {:params => request.params})
+
         unless request.params['SAMLResponse']
           raise OmniAuth::Strategies::SAML::ValidationError.new("SAML response missing")
         end
@@ -63,8 +69,10 @@ module OmniAuth
 
         super
       rescue OmniAuth::Strategies::SAML::ValidationError
+        options[:log_event].call(:error, "callback_phase", {:error => $!, :params => request.params})
         fail!(:invalid_ticket, $!)
       rescue OneLogin::RubySaml::ValidationError
+        options[:log_event].call(:error, "callback_phase", {:error => $!, :params => request.params})
         fail!(:invalid_ticket, $!)
       end
 

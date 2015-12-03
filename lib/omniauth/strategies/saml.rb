@@ -18,6 +18,10 @@ module OmniAuth
 
       option :log_event, Proc.new { |event_type, message, data| }
 
+      option(:process_attributes, Proc.new do |response|
+        [response.name_id, response.attributes]
+      end)
+
       def request_phase
         options[:log_event].call(:request, "request_phase", {:params => request.params})
 
@@ -56,8 +60,7 @@ module OmniAuth
         response.settings = OneLogin::RubySaml::Settings.new(options)
         response.attributes['fingerprint'] = options.idp_cert_fingerprint
 
-        @name_id = response.name_id
-        @attributes = response.attributes
+        @name_id, @attributes, @info = options[:process_attributes].call(response)
 
         if @name_id.nil? || @name_id.empty?
           raise OmniAuth::Strategies::SAML::ValidationError.new("SAML response missing 'name_id'")
@@ -111,7 +114,7 @@ module OmniAuth
       uid { @name_id }
 
       info do
-        {
+        @info || {
           :name  => @attributes[:name],
           :email => @attributes[:email] || @attributes[:mail],
           :first_name => @attributes[:first_name] || @attributes[:firstname] || @attributes[:firstName],
